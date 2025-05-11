@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,17 +7,20 @@ import { useToast } from '@/components/ui/use-toast';
 import { useDatabase } from '@/lib/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateSimilarity } from '@/lib/similarity';
+import { supabase, lastExampleShown } from '@/integrations/supabase/client';
 
 interface PracticeExerciseProps {
   difficulty: string;
-  onComplete: () => void;
+  onComplete: (exampleId: number) => void;
   onChangeDifficulty: () => void;
+  lastExampleId: number | null;
 }
 
 const PracticeExercise: React.FC<PracticeExerciseProps> = ({ 
   difficulty, 
   onComplete,
-  onChangeDifficulty
+  onChangeDifficulty,
+  lastExampleId
 }) => {
   const { user } = useAuth();
   const { getNextPracticeExample, getExampleInfo, savePracticeScore } = useDatabase();
@@ -33,7 +35,7 @@ const PracticeExercise: React.FC<PracticeExerciseProps> = ({
   const [exampleInfo, setExampleInfo] = useState<any>(null);
 
   // Load a new practice example
-  const loadNextExample = () => {
+  const loadNextExample = async () => {
     setLoading(true);
     setUserAnswer('');
     setShowWord(false);
@@ -41,19 +43,33 @@ const PracticeExercise: React.FC<PracticeExerciseProps> = ({
     setScore(null);
     
     if (user) {
-      const example = getNextPracticeExample(user.UserID, difficulty);
-      
-      if (example) {
-        setCurrentExample(example);
-        const info = getExampleInfo(example.exampleID);
-        setExampleInfo(info);
-      } else {
+      try {
+        // Update lastExampleShown in memory to prevent getting the same example
+        if (lastExampleId && user.UserID) {
+          lastExampleShown[user.UserID] = lastExampleId;
+        }
+        
+        const example = await getNextPracticeExample(user.UserID, difficulty);
+        
+        if (example) {
+          setCurrentExample(example);
+          const info = await getExampleInfo(example.exampleid);
+          setExampleInfo(info);
+        } else {
+          toast({
+            title: "No Examples Available",
+            description: "No examples available for this difficulty level.",
+            variant: "destructive"
+          });
+          onChangeDifficulty();
+        }
+      } catch (error) {
+        console.error("Error loading example:", error);
         toast({
-          title: "No Examples Available",
-          description: "No examples available for this difficulty level.",
+          title: "Error",
+          description: "Failed to load practice example.",
           variant: "destructive"
         });
-        onChangeDifficulty();
       }
     }
     
@@ -63,17 +79,17 @@ const PracticeExercise: React.FC<PracticeExerciseProps> = ({
   // Load example on component mount or when difficulty changes
   useEffect(() => {
     loadNextExample();
-  }, [difficulty, user]);
+  }, [difficulty, user, lastExampleId]);
 
   // Handle submit answer
   const handleSubmit = () => {
     if (currentExample && userAnswer.trim()) {
-      const similarityScore = calculateSimilarity(userAnswer, currentExample.English);
+      const similarityScore = calculateSimilarity(userAnswer, currentExample.english);
       setScore(similarityScore);
       
       // Save score to database
       if (user) {
-        savePracticeScore(user.UserID, currentExample.exampleID, similarityScore);
+        savePracticeScore(user.UserID, currentExample.exampleid, similarityScore);
       }
     }
   };
@@ -81,6 +97,15 @@ const PracticeExercise: React.FC<PracticeExerciseProps> = ({
   // Handle next example
   const handleNextExample = () => {
     loadNextExample();
+  };
+
+  // Handle complete
+  const handleComplete = () => {
+    if (currentExample) {
+      onComplete(currentExample.exampleid);
+    } else {
+      onChangeDifficulty();
+    }
   };
 
   if (loading) {
@@ -117,7 +142,7 @@ const PracticeExercise: React.FC<PracticeExerciseProps> = ({
         {/* Persian text to translate */}
         <div className="bg-blue-50 p-4 rounded-lg text-center">
           <h3 className="text-lg font-semibold mb-2">Translate to English:</h3>
-          <p className="text-2xl font-medium" dir="rtl">{currentExample.Persian}</p>
+          <p className="text-2xl font-medium" dir="rtl">{currentExample.persian}</p>
         </div>
 
         {/* Word hint (initially hidden) */}
@@ -162,7 +187,7 @@ const PracticeExercise: React.FC<PracticeExerciseProps> = ({
               </Button>
               {showAnswer && (
                 <div className="w-full mt-2 p-3 bg-green-50 rounded-md">
-                  <p className="font-medium">Answer: {currentExample.English}</p>
+                  <p className="font-medium">Answer: {currentExample.english}</p>
                 </div>
               )}
             </div>
@@ -175,7 +200,7 @@ const PracticeExercise: React.FC<PracticeExerciseProps> = ({
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-2">Correct Answer:</h3>
-              <p className="p-3 bg-green-50 rounded-md">{currentExample.English}</p>
+              <p className="p-3 bg-green-50 rounded-md">{currentExample.english}</p>
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-2">Your Score:</h3>
@@ -208,7 +233,7 @@ const PracticeExercise: React.FC<PracticeExerciseProps> = ({
             Submit
           </Button>
         ) : (
-          <Button onClick={handleNextExample}>Next Example</Button>
+          <Button onClick={handleComplete}>Next Example</Button>
         )}
       </CardFooter>
     </Card>

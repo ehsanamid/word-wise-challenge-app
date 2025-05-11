@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 const PracticePage = () => {
   const { user, logout } = useAuth();
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
+  const [lastExampleId, setLastExampleId] = useState<number | null>(null);
 
   const handleSelectDifficulty = (difficulty: string) => {
     setSelectedDifficulty(difficulty);
@@ -17,7 +18,8 @@ const PracticePage = () => {
     setSelectedDifficulty(null);
   };
 
-  const handleComplete = () => {
+  const handleComplete = (exampleId: number) => {
+    setLastExampleId(exampleId);
     setSelectedDifficulty(null);
   };
 
@@ -37,6 +39,7 @@ const PracticePage = () => {
             difficulty={selectedDifficulty}
             onComplete={handleComplete}
             onChangeDifficulty={handleChangeDifficulty}
+            lastExampleId={lastExampleId}
           />
         ) : (
           <DifficultySelector onSelect={handleSelectDifficulty} />
