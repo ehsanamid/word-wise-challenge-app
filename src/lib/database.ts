@@ -41,6 +41,8 @@ export interface Practice {
 // SQLite database instance
 let SQL: any;
 let db: any;
+// Track the last example shown to each user
+const lastExampleShown: Record<number, number> = {};
 
 // Initialize SQL.js
 export const initDatabase = async () => {
@@ -300,24 +302,28 @@ export const useDatabase = () => {
   // Get next practice example
   const getNextPracticeExample = (userId: number, difficulty: string): any => {
     try {
-      // First try to get examples with score less than 100
+      // Get the ID of the last example shown to this user
+      const lastExampleId = lastExampleShown[userId] || -1;
+      
+      // First try to get examples with score less than 100, excluding the last example
       const lowScoreExamples = executeQuery(`
         SELECT e.*, p.score 
         FROM tblExample e
         JOIN tblPractice p ON e.exampleID = p.exampleID
         JOIN tblDefinition d ON e.definitionID = d.definitionID
         JOIN tblWord w ON d.wordID = w.wordID
-        WHERE p.UserID = ? AND p.score < 100 AND w.difficulty = ?
+        WHERE p.UserID = ? AND p.score < 100 AND w.difficulty = ? AND e.exampleID != ?
         ORDER BY RANDOM()
         LIMIT 1
-      `, [userId, difficulty]);
+      `, [userId, difficulty, lastExampleId]);
       
       if (lowScoreExamples.length > 0) {
+        // Update the last example shown for this user
+        lastExampleShown[userId] = lowScoreExamples[0].exampleID;
         return lowScoreExamples[0];
       }
       
-      // If no low score examples, get a random example of the selected difficulty
-      // that hasn't been practiced yet
+      // If no low score examples, get a random unpracticed example, excluding the last one
       const unpracticedExamples = executeQuery(`
         SELECT e.* 
         FROM tblExample e
@@ -325,18 +331,36 @@ export const useDatabase = () => {
         JOIN tblWord w ON d.wordID = w.wordID
         WHERE w.difficulty = ? AND e.exampleID NOT IN (
           SELECT exampleID FROM tblPractice WHERE UserID = ?
-        )
+        ) AND e.exampleID != ?
         ORDER BY RANDOM()
         LIMIT 1
-      `, [difficulty, userId]);
+      `, [difficulty, userId, lastExampleId]);
       
       if (unpracticedExamples.length > 0) {
+        // Update the last example shown for this user
+        lastExampleShown[userId] = unpracticedExamples[0].exampleID;
         return unpracticedExamples[0];
       }
       
-      // If all examples have been practiced and scored >= 100,
-      // just get a random example of the selected difficulty
-      const randomExample = executeQuery(`
+      // If all examples have been practiced and scored >= 100, just get a random one excluding the last one
+      const randomExamples = executeQuery(`
+        SELECT e.* 
+        FROM tblExample e
+        JOIN tblDefinition d ON e.definitionID = d.definitionID
+        JOIN tblWord w ON d.wordID = w.wordID
+        WHERE w.difficulty = ? AND e.exampleID != ?
+        ORDER BY RANDOM()
+        LIMIT 1
+      `, [difficulty, lastExampleId]);
+      
+      if (randomExamples.length > 0) {
+        // Update the last example shown for this user
+        lastExampleShown[userId] = randomExamples[0].exampleID;
+        return randomExamples[0];
+      }
+      
+      // If there's only one example for this difficulty level, we have to use it
+      const anyExample = executeQuery(`
         SELECT e.* 
         FROM tblExample e
         JOIN tblDefinition d ON e.definitionID = d.definitionID
@@ -346,7 +370,13 @@ export const useDatabase = () => {
         LIMIT 1
       `, [difficulty]);
       
-      return randomExample.length > 0 ? randomExample[0] : null;
+      if (anyExample.length > 0) {
+        // Update the last example shown, even if it's the same
+        lastExampleShown[userId] = anyExample[0].exampleID;
+        return anyExample[0];
+      }
+      
+      return null;
     } catch (error) {
       console.error("Error getting next practice example:", error);
       return null;
