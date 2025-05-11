@@ -250,10 +250,10 @@ export const useDatabase = () => {
           user_id: userId,
           diff: difficulty,
           last_example_id: lastExampleId
-        })
-        .limit(1);
+        });
       
       if (unpracticedError) {
+        console.error("Error with RPC:", unpracticedError);
         // If the RPC is not available, fallback to a more complex query
         const practicedIds = await getPracticedExampleIds(userId);
         
@@ -271,17 +271,20 @@ export const useDatabase = () => {
             )
           `)
           .eq('tblDefinition.tblWord.difficulty', difficulty)
-          .neq('exampleid', lastExampleId)
-          .not('exampleid', 'in', `(${practicedIds.join(',')})`)
-          .limit(1);
+          .neq('exampleid', lastExampleId);
         
         if (fallbackError) throw fallbackError;
         
-        if (unpracticedExamples && unpracticedExamples.length > 0) {
+        // Filter out examples that have been practiced
+        const filteredExamples = unpracticedExamples?.filter(
+          example => !practicedIds.includes(example.exampleid)
+        );
+        
+        if (filteredExamples && filteredExamples.length > 0) {
           // Update the last example shown for this user
-          lastExampleShown[userId] = unpracticedExamples[0].exampleid;
-          console.log("Using fallback unpracticed example:", unpracticedExamples[0].exampleid);
-          return unpracticedExamples[0];
+          lastExampleShown[userId] = filteredExamples[0].exampleid;
+          console.log("Using fallback unpracticed example:", filteredExamples[0].exampleid);
+          return filteredExamples[0];
         }
       } else if (unpracticedData && unpracticedData.length > 0) {
         // Update the last example shown for this user

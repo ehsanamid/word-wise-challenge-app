@@ -150,7 +150,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_unpracticed_examples: {
+        Args: { user_id: number; diff: string; last_example_id?: number }
+        Returns: {
+          exampleid: number
+          definitionid: number
+          english: string
+          persian: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
