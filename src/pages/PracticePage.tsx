@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import DifficultySelector from '@/components/DifficultySelector';
-import PracticeExercise from '@/components/PracticeExercise';
+import PracticeExercise from '@/components/practice/PracticeExercise';
 import { Button } from '@/components/ui/button';
 
 const PracticePage = () => {
