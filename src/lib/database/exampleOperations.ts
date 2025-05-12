@@ -5,6 +5,7 @@ import { Example } from './types';
 // Get examples by difficulty
 export const getExamplesByDifficulty = async (difficulty: string): Promise<Example[]> => {
   try {
+    console.log("Fetching examples for difficulty:", difficulty);
     const { data, error } = await supabase
       .from('tblexample')
       .select(`
@@ -20,8 +21,12 @@ export const getExamplesByDifficulty = async (difficulty: string): Promise<Examp
       `)
       .eq('tblDefinition.tblWord.difficulty', difficulty);
     
-    if (error) throw error;
+    if (error) {
+      console.error("Error fetching examples:", error);
+      throw error;
+    }
     
+    console.log("Examples fetched:", data?.length || 0);
     return (data || []) as unknown as Example[];
   } catch (error) {
     console.error("Error fetching examples:", error);
