@@ -49,9 +49,12 @@ export const useDatabase = () => {
   // User authentication
   const registerUser = async (username: string, email: string, password: string): Promise<number> => {
     try {
+      // We no longer store passwords in the database
+      const cleanPassword = ''; // Store empty password
+      
       const { data, error } = await supabase
         .from('tbluser')
-        .insert([{ username, email, password }])
+        .insert([{ username, email, password: cleanPassword }])
         .select('userid')
         .single();
       
@@ -66,12 +69,25 @@ export const useDatabase = () => {
 
   const loginUser = async (username: string, password: string): Promise<User | null> => {
     try {
-      const { data, error } = await supabase
+      // If we have a password, we're doing a legacy login
+      // If no password, we're just fetching user info based on username or email
+      const query = supabase
         .from('tbluser')
-        .select('*')
-        .eq('username', username)
-        .eq('password', password)
-        .single();
+        .select('*');
+
+      // Build the query based on whether username is an email or not
+      if (username.includes('@')) {
+        query.eq('email', username);
+      } else {
+        query.eq('username', username);
+      }
+
+      // Only check password if provided (legacy login)
+      if (password) {
+        query.eq('password', password);
+      }
+
+      const { data, error } = await query.single();
       
       if (error) {
         console.error("Login error:", error);
