@@ -26,34 +26,34 @@ export const usePracticeExample = (difficulty: string, lastExampleId: number | n
     setShowAnswer(false);
     setScore(null);
     
-    if (user) {
-      try {
-        // Update lastExampleShown in memory to prevent getting the same example
-        if (lastExampleId && user.UserID) {
-          lastExampleShown[user.UserID] = lastExampleId;
-        }
-        
-        const example = await getNextPracticeExample(user.UserID, difficulty);
-        
-        if (example) {
-          setCurrentExample(example);
-          const info = await getExampleInfo(example.exampleid);
-          setExampleInfo(info);
-        } else {
-          toast({
-            title: "No Examples Available",
-            description: "No examples available for this difficulty level.",
-            variant: "destructive"
-          });
-        }
-      } catch (error) {
-        console.error("Error loading example:", error);
+    try {
+      // Update lastExampleShown in memory to prevent getting the same example
+      if (lastExampleId && user?.UserID) {
+        lastExampleShown[user.UserID] = lastExampleId;
+      }
+      
+      // We pass the user ID if available, otherwise we just get examples without tracking
+      const userId = user?.UserID;
+      const example = await getNextPracticeExample(userId, difficulty);
+      
+      if (example) {
+        setCurrentExample(example);
+        const info = await getExampleInfo(example.exampleid);
+        setExampleInfo(info);
+      } else {
         toast({
-          title: "Error",
-          description: "Failed to load practice example.",
+          title: "No Examples Available",
+          description: "No examples available for this difficulty level.",
           variant: "destructive"
         });
       }
+    } catch (error) {
+      console.error("Error loading example:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load practice example.",
+        variant: "destructive"
+      });
     }
     
     setLoading(false);
@@ -66,7 +66,7 @@ export const usePracticeExample = (difficulty: string, lastExampleId: number | n
 
   // Save score to database
   const saveScore = (similarityScore: number) => {
-    if (user && currentExample) {
+    if (user?.UserID && currentExample) {
       savePracticeScore(user.UserID, currentExample.exampleid, similarityScore);
     }
   };
